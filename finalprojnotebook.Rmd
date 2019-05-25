@@ -1,0 +1,977 @@
+---
+title: "ECON C142 FINAL PROJECT"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+
+
+```{r message=FALSE, warning=FALSE}
+library(AER)
+library(stargazer)
+library(dplyr)
+library(glmnetUtils)
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+df = read.csv("sample.csv")
+```
+
+RMSE helper function
+```{r}
+rmse <- function(res) {
+  return(sqrt(crossprod(res)/length(res)))
+}
+```
+
+\newpage
+# Part 1
+
+## 1 - Models for having 3+ kids
+
+Making the models
+```{r}
+m1_lm <- lm(morekids ~ educm + agem + agefstm, df)
+m2_lm <- lm(morekids ~ factor(educm) + agem + agefstm, df)
+m3_lm <- lm(morekids ~ factor(educm) + factor(agem) + factor(agefstm), df)
+```
+
+Calculating r-square, adj-r-square, and rmse vals
+```{r}
+r_squared_vals <- c(summary(m1_lm)$r.squared, summary(m2_lm)$r.squared, summary(m3_lm)$r.squared)
+names(r_squared_vals) <- c("Model 1", "Model 2", "Model 3")
+adj_rsqua_vals <- c(summary(m1_lm)$adj.r.squared, summary(m2_lm)$adj.r.squared, summary(m3_lm)$adj.r.squared)
+names(adj_rsqua_vals) <- c("Model 1", "Model 2", "Model 3")
+rmse_vals <- c(rmse(m1_lm$residuals), rmse(m2_lm$residuals), rmse(m3_lm$residuals))
+names(rmse_vals) <- c("Model 1", "Model 2", "Model 3")
+aic_vals <- c(AIC(m1_lm), AIC(m2_lm), AIC(m3_lm))
+names(aic_vals) <- c("Model 1", "Model 2", "Model 3")
+
+print(r_squared_vals)
+print(adj_rsqua_vals)
+print(rmse_vals)
+print(aic_vals)
+```
+
+\newpage
+### (i) - difference in probabilities for age 35 vs 30, and associated standard errors
+
+Model 1:
+
+Difference in probabilities is considered holding all other coefficients constant, which will cancel out when the probability expressions are subtracted from each other. $$Diff = 35\beta_{agem} - 30\beta_{agem}$$.
+For the standard error, $$SE(Diff) = \sqrt{Var(Diff)} = \sqrt{Var((35-30)\beta_{agem})} = \sqrt{25*Var(\beta_{agem})} = 5*\sqrt{Var(\beta_{agem})} = 5*SE(\beta_{agem}) $$
+
+```{r}
+i_m1 <- m1_lm$coefficients["agem"]*(35-30)
+i_se_m1 <- 5*summary(m1_lm)$coefficients["agem", "Std. Error"]
+
+unname(i_m1)
+i_se_m1
+```
+For M1, the difference is 0.1486871 and the SE is 0.001555809.
+\
+\
+\
+Model 2:
+
+Difference in probabilities, and standard error, are the same formula as in Model 1. Despite Model 2 containing dummies, we once again hold all of them constant and they cancel out, leading to the same expression for the Diff. 
+```{r}
+i_m2 <- m2_lm$coefficients["agem"]*(35-30)
+i_se_m2 <- 5*summary(m2_lm)$coefficients["agem", "Std. Error"]
+
+unname(i_m2)
+i_se_m2
+```
+For M2, the difference is 0.1486034 and the SE is 0.00155253
+\
+\
+\
+Model 3:
+
+When taking the difference in probabilities, we hold other coefficients constant, changing only the dummy variables for agem==35 and agem==30. Thus, the expression for the difference becomes $Diff = X_{agem=35} - X_{agem=30}$, and thus, $$SE(Diff) = \sqrt{Var(Diff)} = \sqrt{Var(X_{agem=35} - X_{agem=30})} $$ $$= \sqrt{Var(X_{agem=35}) + Var(X_{agem=30}) - 2Cov(X_{agem=35}, X_{agem=30})}$$. Since the two RVs $X_{agem=35}$ and $X_{agem=30}$ are not independent, the covariance is nonzero, and we have to manually work this expression out.
+```{r}
+i_m3 <- m3_lm$coefficients["factor(agem)35"] - m3_lm$coefficients["factor(agem)30"]
+vcov_mat <- vcov(m3_lm)
+var_x35 <- vcov_mat["factor(agem)35", "factor(agem)35"]
+var_x30 <- vcov_mat["factor(agem)30", "factor(agem)30"]
+cov_x35_x30 <- vcov_mat["factor(agem)35", "factor(agem)30"]
+
+i_se_m3 <- sqrt(var_x35 + var_x30 - 2*cov_x35_x30) 
+
+i_m3
+i_se_m3
+```
+For M3, the difference is 0.1391881 and the SE is 0.00441031
+\newpage
+
+### (ii) - difference in probabilities for 16 vs 12 years of education, and associated standard errors
+
+The methods are the same as above, just with different random variables/coefficients. The only difference is that the Standard Error of the difference for model 2 must be recomputed with the same method as model 3 in part (i). So, rederivations are not done. 
+\
+\
+
+Model 1:
+
+```{r}
+ii_m1 <- m1_lm$coefficients["educm"]*(16-12)
+ii_se_m1 <- 4*summary(m1_lm)$coefficients["educm", "Std. Error"]
+
+ii_m1
+ii_se_m1
+```
+For M1, the difference is -0.05464697  and the SE is 0.00180017.
+
+
+\
+\
+\
+
+
+Model 2:
+
+
+```{r}
+ii_m2 <- m2_lm$coefficients["factor(educm)16"] - m2_lm$coefficients["factor(educm)12"]
+vcov_mat <- vcov(m2_lm)
+var_x16 <- vcov_mat["factor(educm)16", "factor(educm)16"]
+var_x12 <- vcov_mat["factor(educm)12", "factor(educm)12"]
+cov_x16_x12 <- vcov_mat["factor(educm)16", "factor(educm)12"]
+
+ii_se_m2 <- sqrt(var_x16 + var_x12 - 2*cov_x16_x12)
+
+ii_m2
+ii_se_m2
+```
+For M2, the difference is 0.02868078  and the SE is 0.003687303.
+
+\
+\
+\
+
+Model 3:
+
+```{r}
+ii_m3 <- m3_lm$coefficients["factor(educm)16"] - m3_lm$coefficients["factor(educm)12"]
+vcov_mat <- vcov(m3_lm)
+var_x16 <- vcov_mat["factor(educm)16", "factor(educm)16"]
+var_x12 <- vcov_mat["factor(educm)12", "factor(educm)12"]
+cov_x16_x12 <- vcov_mat["factor(educm)16", "factor(educm)12"]
+
+ii_se_m3 <- sqrt(var_x16 + var_x12 - 2*cov_x16_x12)
+
+ii_m3
+ii_se_m3
+```
+For M3, the difference is 0.03305081  and the SE is 0.003730534.
+
+\newpage
+
+### (iii) Differences for first child at age 20 vs 25
+Same stuff as section (ii), just with different variables.
+
+Model 1:
+
+```{r}
+iii_m1 <- m1_lm$coefficients["agefstm"]*(25-20)
+iii_se_m1 <- 5*summary(m1_lm)$coefficients["agefstm", "Std. Error"]
+
+iii_m1
+iii_se_m1
+```
+For M1, the difference is -0.1924384  and the SE is 0.001976325
+
+\
+\
+\
+
+Model 2:
+
+```{r}
+iii_m2 <- m2_lm$coefficients["agefstm"]*(25-20)
+iii_se_m2 <- 5*summary(m2_lm)$coefficients["agefstm", "Std. Error"]
+
+iii_m2
+iii_se_m2
+```
+For M2, the difference is -0.2032896  and the SE is 0.002052919
+\
+\
+\
+
+Model 3:
+
+```{r}
+iii_m3 <- m3_lm$coefficients["factor(agefstm)25"] - m3_lm$coefficients["factor(agefstm)20"]
+vcov_mat <- vcov(m3_lm)
+var_x25 <- vcov_mat["factor(agefstm)25", "factor(agefstm)25"]
+var_x20 <- vcov_mat["factor(agefstm)20", "factor(agefstm)20"]
+cov_x25_x20 <- vcov_mat["factor(agefstm)25", "factor(agefstm)20"]
+
+iii_se_m3 <- sqrt(var_x25 + var_x20 - 2*cov_x25_x20)
+
+iii_m3
+iii_se_m3
+```
+For M3, the difference is -0.2219466  and the SE is 0.005244743
+
+\newpage
+
+### Graphs
+Graphing the actual and predicted probabilities for M1, M2, M3 of having >3 kids for 35 y/o mothers with 12 years of education, over agefstm values 17-30.
+
+Computing the predicted probabilities:
+```{r}
+m1_preds <- c()
+m2_preds <- c()
+m3_preds <- c()
+
+dummystuffm2 <- c(rep(0, 20))
+dummystuffm2[12] <- 1
+
+dummystuffm3edu <- c(rep(0, 20))
+dummystuffm3edu[12] <- 1
+
+dummystuffm3age <- c(rep(0, 14))
+dummystuffm3age[14] <- 1
+
+dummystuffm3afval <- c(rep(0, 18))
+
+actual_probs <- c()
+
+# new <- data.frame(agem=c(35)*14)
+for (afval in c(17:30)) {
+  m1_p <- sum(m1_lm$coefficients*c(1, 12, 35, afval))
+  m2_p <- sum(m2_lm$coefficients*c(1, dummystuffm2, 35, afval))
+  
+  dummystuffm3afval[afval-15] <- 1
+  m3_p <- sum(m3_lm$coefficients*c(1, dummystuffm3edu, dummystuffm3age, dummystuffm3afval))
+  dummystuffm3afval[afval-15] <- 0
+  
+  m1_preds <- c(m1_preds, m1_p)
+  m2_preds <- c(m2_preds, m2_p)
+  m3_preds <- c(m3_preds, m3_p)
+  
+  av <- mean(subset(df, (educm == 12) & (agefstm == afval) & (agem == 35))$morekids)
+  
+  actual_probs <- c(actual_probs, av)
+}
+
+```
+
+\newpage
+Graphing the actual predicted values:
+```{r}
+x_axis = c(17:30)
+plot(x_axis, m1_preds, type="l", col="red", main="Pred. prob. of having 3+ children with fixed mother's age+edu", xlab="Age of mother at time of first child", ylab="Probability of having 3+ children")
+lines(x_axis, m2_preds, col="green")
+lines(x_axis, m3_preds, col="blue")
+lines(x_axis, actual_probs, col="purple")
+
+legend("topright", legend=c("Model 1", "Model 2", "Model 3", "Actual"),
+       col=c("red", "green", "blue", "purple"), lty=1:2, cex=0.8)
+```
+
+*A comparison of the models:*
+
+In comparing M1, M2, and M3, we first theoretically consider what "binning" generally does and how it relates to our estimation of the CEF. We next consider how this general theory relates to the models/situation at hand to evaluate pros and cons of the three models. We finally take an empirical stance by re-fitting and re-validating these models on a train and test set of data to observe how they overfit and generalize.
+
+First, the general theory. 
+
+1. Binning the age (as done in M3) causes us to lose the assumption that the effect of age is constant. It posits that for movements between different ages, you could have different sized effects. 
+
+2. Each of those age effect estimators will have a high standard error (we will compare these next), in part because there is more variation around a singular age bin with fewer datapoints, in part because there are just more degrees of freedom.
+
+3. Finally, and most importantly, binning the age will create a different model from using age as a continuous variable *IF THE CONDITIONAL EXPECTATION FUNCTION E[Y|X] IS NON-LINEAR*. We saw in lecture 3 that if you have dummies for every possible data point, you fit the mean of each datapoint, thus obtaining the CEF. This is super important! If the CEF is non-linear, the models will differ, so it is important to consider the linearity of the population CEF versus the linearity of the sample CEF.
+
+Now, apply this general theory to our situation. 
+
+1. Is the effect of agefstm on having more children constant? I would expect it mostly is. The change in probability from, say, 23-25 has no reason to be different than the change in probability from 33-35. I don't see any specific ages where there may be a discontinuity or a particularly prominent jump/change in slope. This means M1 and M2 are more likely to be "True" in my opinion, since they hold agefstm's effect to be constant.
+
+2. Here are the standard errors for model 1 and model 2: $`r summary(m1_lm)$coefficients["agefstm","Std. Error"]`$, and $`r summary(m2_lm)$coefficients["agefstm","Std. Error"]`$. In contrast, here are some of the standard errors for model 3: for agefstm = 25, $`r summary(m3_lm)$coefficients["factor(agefstm)25","Std. Error"]`$, and for agefstm = 30, $`r summary(m3_lm)$coefficients["factor(agefstm)30","Std. Error"]`$. Way bigger SEs! Another reason to prefer M1 and M2, for lower variability in estimates.
+
+3. The sample CEF is clearly nonlinear (look at the plotted "actual probabilities"). Thus, M3 estimates a nonlinear model. I hypothesize that this might be bad, because though the sample CEF is nonlinear, the population CEF might be linear, and these nonlinearities are the result of randomness in the data. Thus, M3 would be capturing little trends/idiosyncracies that do not generalize well compared to M1 and M2. However, there is no way to argue this analytically - we can just test that thought empirically below.
+ 
+Last is the empirical validation:
+```{r}
+train1_df <- subset(df, (rv < 0.75))
+holdout1_df <- subset(df, (rv >= 0.75))
+
+m1_vlm <- lm(morekids ~ educm + agem + agefstm, train1_df)
+m2_vlm <- lm(morekids ~ factor(educm) + agem + agefstm, train1_df)
+m3_vlm <- lm(morekids ~ factor(educm) + factor(agem) + factor(agefstm), train1_df)
+
+m1_rmse_val <- mean((predict(m1_vlm, newdata=holdout1_df) - holdout1_df$morekids)^2)
+m2_rmse_val <- mean((predict(m2_vlm, newdata=holdout1_df) - holdout1_df$morekids)^2)
+m3_rmse_val <- mean((predict(m3_vlm, newdata=holdout1_df) - holdout1_df$morekids)^2)
+
+m1_rmse_train <- mean((predict(m1_vlm) - train1_df$morekids)^2)
+m2_rmse_train <- mean((predict(m2_vlm) - train1_df$morekids)^2)
+m3_rmse_train <- mean((predict(m3_vlm) - train1_df$morekids)^2)
+
+c(m1_rmse_train, m2_rmse_train, m3_rmse_train)
+c(m1_rmse_val, m2_rmse_val, m3_rmse_val)
+```
+
+Well, I have to eat my words. Model 3 does better on both the training and validation sets. Guess it is capturing nonlinearities that exist in the data!
+
+\newpage
+
+## 2 - Richer set of models for morekids, using samesex as instrumental variable
+
+### (a) - extend model 3, conduct F-tests
+```{r}
+m3_ext_lm <- lm(morekids ~ factor(educm) + factor(agem) + factor(agefstm) + educd + aged + blackm + hispm + othracem, df)
+
+m3_ext_nodad_lm <- lm(morekids ~ factor(educm) + factor(agem) + factor(agefstm) + blackm + hispm + othracem, df)
+
+m3_ext_norace_lm <- lm(morekids ~ factor(educm) + factor(agem) + factor(agefstm) + educd + aged, df)
+
+```
+
+Performing some f-tests using the built in anova() function reveals that taking out the 'dad' variables doesn't change the SSR in a statistically significant way, while taking out the 'race' variables does.
+
+```{r}
+ftest1<-anova(m3_ext_lm, m3_ext_nodad_lm)
+ftest2<-anova(m3_ext_lm, m3_ext_norace_lm)
+
+ftest1
+```
+There is not a significant difference between model 1 and model 2 (getting rid of dad variables).
+
+```{r}
+ftest2
+```
+Now, there is a significant difference between the two models when the race/ethnicity variables are removed!
+
+\newpage
+### (b) using samesex as an "exogenous" determinant of family size
+
+Use same model as (a), but add samesex and re-estimate the model.
+```{r}
+m3_ext_samesex_lm <- lm(morekids ~ factor(educm) + factor(agem) + factor(agefstm) + educd + aged + blackm + hispm + othracem + samesex, df)
+```
+
+(i) the average effect of having first two children of the same sex on the probability that morekids=1 is seen by looking at the coefficient on samesex = 0.06880994
+\
+\
+\
+
+(ii) test the claim that families only care about having at least 1 son: 
+
+I find there is a significant difference in the impact of two daughters vs two sons. To test this claim, we specify a regression as follows:
+
+$$ y[morekids=1] = \beta_{0} + \beta'X + \beta_{g}girls2 + \beta_{b}boys2 $$
+If it is true that families only care about having 1 son, then we would expect families who have 2 boys to be less likely to have more children, and we would expect families with 2 girls to want to more children. In stats terms, our null hypothesis is $H_{0}:\beta_{g} - \beta_{b} \leq 0$ (families are either ambivalent, or only care about having 1 girl), and our alternative hypothesis is $H_{A}:\beta_{g} - \beta_{b} > 0$. This is a ONE-TAILED test.
+
+There is a weaker set of hypotheses $$H_{0}:\beta_{g} - \beta_{b} = 0$$ $$H_{A}:\beta_{g} - \beta_{b} \neq 0$$. I am personally interested in testing this first, just to rule out the possibility that the coefficients are equal. Then we can retest a 1-tailed test to see if our stronger alternative hypothesis is true.
+
+To evaluate the above hypotheses, we run the regression to obtain $diff = \hat{\beta_{g}} - \hat{\beta_{b}}$. To see if this difference is statistically significant, we find the standard error of the difference: $$SE = \sqrt{Var(diff)} = \sqrt{Var(\hat{\beta_{g}}) + Var(\hat{\beta_{b}}) - 2*Cov(\hat{\beta_{g}}, \hat{\beta_{b}})}$$ where all the Variance and Covariance terms are reported from the regression. Then, we take the ratio of the difference to the standard error, and compare it against our desired t values for a 95% confidence interval in the two-tailed AND one-tailed cases.
+
+```{r}
+m3_ext_bgtest_lm <- lm(morekids ~ factor(educm) + factor(agem) + factor(agefstm) 
+                       + educd + aged + blackm + hispm + othracem + girls2 + boys2, df)
+
+diff <- m3_ext_bgtest_lm$coefficients["girls2"] - m3_ext_bgtest_lm$coefficients["boys2"]
+vcov_mat <- vcov(m3_ext_bgtest_lm)
+var_g <- vcov_mat["girls2", "girls2"]
+var_b <- vcov_mat["boys2", "boys2"]
+cov_gb <- vcov_mat["girls2", "boys2"]
+se <- sqrt(var_g + var_b - 2*cov_gb)
+unname(diff)
+unname(diff/se)
+```
+The difference between $\beta_{g}$ and $\beta_{b}$ is 0.02127117, and statistically significant at the $p=0.001$ level for both the one-sided and two-sided t-tests (the t-statistic is 7.925297/2 and 7.925297 respectively). Further, the difference is positive, implying that the strong alternative hypothesis is true - if a family already has two boys, they are less likely to have more children than if a family has two girls.
+
+\
+\
+\
+\
+
+(iii) sex composition of children being random
+
+If the gender of children is truly random, then I would expect that $samesex=1$ couldn't be easily explained. In a linear probability model, no matter what variables I included, I would expect the explanatory power (R-squared) to be essentially zero, and for no coefficients to have a statistically significant effect. I would also expect the intercept to estimate the mean (0.5) if sexes were pretty much random. Finally, I would expect the F-statistic to be non-significant, meaning that we stick with the null hypothesis that "all coefficients in the model are equal to zero". The question asks to include variables about age, education, race, and ages of first having children, so I include those in the model.
+
+```{r}
+sexrand1 <- lm(samesex ~ agem + aged + educm + educd + agefstm + agefstd + blackm + blackd + whitem + whited + hispm + hispd, df)
+summary(sexrand1)
+```
+It is clear that there is no explanatory power (the R-squared values are incredibly low), the intercept is about 0.5 (implying that the mean of samesex is being estimated at 0.5), none of the coefficients are even close to significant, and the F-statistic is also insignificant. Thus, samesex appears random, not something that is correlated or explained with race/ethnicity or education or age or age when first conceiving.
+
+\newpage
+## 3 - OLS vs IV models - effect of children on decision to work
+
+### (a) Linear probability models for the event that mom works
+
+First, manually add some variables for our controls:
+
+```{r}
+df$lowedm <- ifelse(df$educm < 12, 1, 0)
+df$lowedd <- ifelse(df$educd < 12, 1, 0)
+df$agem2 <- df$agem^2
+df$aged2 <- df$aged^2
+df$agefstm2 <- df$agefstm^2
+df$agefstd2 <- df$agefstd^2
+```
+
+
+Comparing OLS models W1 and W2 (not including and including controls)
+
+```{r}
+w1_lm <- lm(workedm ~ morekids, df)
+w2_lm <- lm(workedm ~ educm + lowedm + educd + lowedd + agem + agem2 + agefstm + 
+              agefstm2 + aged + aged2 + agefstd + agefstd2 + blackm + hispm + othracem + morekids, df)
+```
+
+The effect size without controls (W1) of having morekids is -0.1134461. With controls (W2), the effect size is -0.1585621. Thus, because these values are different, we conclude that model W1 is like a "short regression", with omitted variables being captured in the residual, and the coefficient estimate attempting to "explain" those omitted variables. W2 is the "long regression" where those omitted variables are present and the coefficient estimate loses some of that bias.
+
+\newpage
+### (b) Using samesex as an IV for a simple causal model
+
+First stage, reduced form, and IV models using samesex as an IV. 
+
+```{r}
+fs_ssiv_lm <- lm(morekids ~ samesex, df)
+rf_ssiv_lm <- lm(workedm ~ samesex, df)
+ssiv_lm <- ivreg(workedm ~ morekids | samesex, data=df)
+```
+
+
+```{r include=FALSE}
+stargazer(fs_ssiv_lm, rf_ssiv_lm, ssiv_lm,
+          out = "1-3-b.tex",
+          font.size = 'small', 
+          omit.stat = c("f","ser", "rsq", "n", "adj.rsq"),
+          omit = c("Constant"),
+          digits=NA,
+          title = 'First stage, reduced, and IV models')
+
+```
+
+The ratio of the reduced form coefficient (workedm regressed on samesex) and the first stage coefficient (morekids regressed on samesex) is $$\frac{-0.0102412}{0.06735206} = -0.15205474$$ which matches the reported coefficient in the instrumental variables regression exactly.
+
+Table below:
+
+
+\newpage
+
+
+### (c) Using samesex as an IV for a model with many controls
+
+```{r}
+fs_ssiv_cont_lm <- lm(morekids ~ samesex + educm + lowedm + educd + lowedd + agem + agem2 + agefstm + agefstm2 + aged + aged2 + agefstd + agefstd2 + blackm + hispm + othracem, df)
+rf_ssiv_cont_lm <- lm(workedm ~ samesex + educm + lowedm + educd + lowedd + agem + agem2 + agefstm + agefstm2 + aged + aged2 + agefstd + agefstd2 + blackm + hispm + othracem, df)
+ssiv_cont_lm <- ivreg(workedm ~ morekids + educm + lowedm + educd + lowedd + agem + agem2 + agefstm + agefstm2 + aged + aged2 + agefstd + agefstd2 + blackm + hispm + othracem | samesex + educm + lowedm + educd + lowedd + agem + agem2 + agefstm + agefstm2 + aged + aged2 + agefstd + agefstd2 + blackm + hispm + othracem, data=df)
+```
+
+```{r include=FALSE}
+stargazer(fs_ssiv_cont_lm, rf_ssiv_cont_lm, ssiv_cont_lm,
+          out = "1-3-c-2.tex",
+          font.size = 'small', 
+          omit.stat = c("f","ser", "rsq", "n", "adj.rsq"),
+          omit = c("Constant", "educm", "lowedm", "educd", "lowedd", "agem", "agem2", "agefstm", "agefstm2", "aged", "aged2", "agefstd", "agefstd2", "blackm", "hispm", "othracem"),
+          digits=NA,
+          title = 'First stage, reduced, and IV models with controls')
+
+```
+
+The ratio of the reduced form and the first stage is $$\frac{-0.009463403}{0.06895031} = -0.137249608$$ which matches the reported coefficient in the instrumental variables regression exactly. 
+
+Table below:
+
+\newpage
+
+### (d) Proof that a truly random IV's estimate is approx the same with/without controls
+
+Proof on next page.
+
+\newpage
+
+
+### (e) Evaluate the difference in IV estimates in parts (b) and (c), based on part (d)
+
+The IV estimates in (b) and (c) are not exactly equal. The theory says that they would be equal only if instrumental variable $samesex$ were uncorrelated with the controls; thus, we can infer that $samesex$ is correlated somehow with the controls. 
+
+I can think of two ways to test whether the two estimates are statistically different - the first is less formal and relies on an F-statistic, and the second is a formal test called the Wald test.
+
+First, let us look at the relationship between $samesex$ and the controls. If there is a statistically significant relationship between the two, we can assume that this correlation affected the estimates in a statistically significant way. Right off the bat, however, I'm guessing that there won't be much of a connection, because $samesex$ is "truly randomly" assigned, as we saw in part 2(b)(iii). We observe the F-statistic for a model regressing $samesex$ on the controls.
+
+```{r}
+aux_iv_lm <- lm(samesex ~ educm + lowedm + educd + lowedd + agem + agem2 + agefstm + agefstm2 + aged + aged2 + agefstd + agefstd2 + blackm + hispm + othracem, df)
+summary(aux_iv_lm)
+```
+
+Recall that the reported F-statistic below is the result of a test where the null hypothesis is "all coefficients are zero". Since the F-statistic is not significant, it appears that the relationship between $samesex$ and these controls is mostly spurious.
+
+What this means is that our assumption from part (d) - namely, $E[z_{i}*x_{Oi}] = 0$ is probably true - however, since this is true only in expectation, we probably got some random variation to make it != 0, though not in any significant way.
+
+As for individual terms, it appears that $samesex$ is correlated with $educm<12$, and both terms for the mother's age. However, the super low R-squared values also imply that these controls don't really explain much of the variance in $samesex$.
+
+You can also think of it as, we are testing the hypothesis $\beta_{samesex,controls} - \beta_{samesex,nocontrol} = 0$. However, this can't be formally tested with a good ol' t-test; it requires the standard error of the difference, which is the square root of $$Var(\beta_{ss,c} - \beta_{ss,nc}) = Var(\beta_{ss,c}) + Var(\beta_{ss,nc}) - 2*Cov(\beta_{ss,c}, \beta_{ss,nc})$$. Though the variances can be retrieved from the original regressions, the covariance cannot be.
+
+HOWEVER, this is what is known as a "nested model", and coefficients can be compared with a Wald test. The Wald test asks the basic question, "does reducing these other parameters to zero significantly reduce the model fit?" This is fortunately easy in R!
+
+```{r}
+waldtest(ssiv_cont_lm,ssiv_lm)
+```
+The results above show that only the "morekids" variable is statistically significant. Thus, we conclude that the difference between the "base" model and the larger model it is nested in is a significant difference. 
+
+\newpage
+### (f) relationship between causal effect of having extra kids on the decision to work, and observational comparisons
+
+Based on the OLS and IV models, I conclude that having more kids does have a causal effect on a mother's decision to work. This explains a lot of the observational comparisons between mothers with 2 versus 3+ kids. Let's compare the mean values for mothers with 2 kids versus mothers with 3+ kids by subsetting the dataframe and subtracting the column means for some variables we are interested in.
+
+```{r}
+withmorekids = select(subset(df, morekids==1), educm, workedm, hrsweekm, annhrsm, earningsm, faminc, expm, lowedm)
+withlesskids = select(subset(df, morekids==0), educm, workedm, hrsweekm, annhrsm, earningsm, faminc, expm, lowedm)
+
+colMeans(withmorekids) - colMeans(withlesskids)
+```
+It appears from the output above that if you have more kids, education/propensity to work/hours worked/earnings all tend to be lower (the average is lower for people with morekids than lesskids, so the difference is negative). The mothers with morekids tend to have more years of work after completing school though, and a higher propensity to have low education (the positive values).
+
+## 4 - compare OLS and IV models for morekids effect on earnings
+
+### (a) - estimate 2 OLS and 2 IV models for mother's, father's, and total earnings.
+
+```{r}
+earnm_ols <- lm(earningsm ~ morekids, df)
+earnm_cont_ols <- lm(earningsm ~ morekids + educm + lowedm + educd + lowedd + agem + agem2 + agefstm + agefstm2 + aged + aged2 + agefstd + agefstd2 + blackm + hispm + othracem, df)
+
+earnd_ols <- lm(earningsd ~ morekids, df)
+earnd_cont_ols <- lm(earningsd ~ morekids + educm + lowedm + educd + lowedd + agem + agem2 + agefstm + agefstm2 + aged + aged2 + agefstd + agefstd2 + blackm + hispm + othracem, df)
+
+famearn_ols <- lm(famearn ~ morekids, df)
+famearn_cont_ols <- lm(famearn ~ morekids + educm + lowedm + educd + lowedd + agem + agem2 + agefstm + agefstm2 + aged + aged2 + agefstd + agefstd2 + blackm + hispm + othracem, df)
+
+
+earnm_iv <- ivreg(earningsm ~ morekids|samesex, data=df)
+earnm_cont_iv <- ivreg(earningsm ~ morekids + educm + lowedm + educd + lowedd + agem + agem2 + agefstm + agefstm2 + aged + aged2 + agefstd + agefstd2 + blackm + hispm + othracem|samesex + educm + lowedm + educd + lowedd + agem + agem2 + agefstm + agefstm2 + aged + aged2 + agefstd + agefstd2 + blackm + hispm + othracem, data=df)
+
+earnd_iv <- ivreg(earningsd ~ morekids|samesex, data=df)
+earnd_cont_iv <- ivreg(earningsd ~ morekids + educm + lowedm + educd + lowedd + agem + agem2 + agefstm + agefstm2 + aged + aged2 + agefstd + agefstd2 + blackm + hispm + othracem|samesex + educm + lowedm + educd + lowedd + agem + agem2 + agefstm + agefstm2 + aged + aged2 + agefstd + agefstd2 + blackm + hispm + othracem, data=df)
+
+famearn_iv <- ivreg(famearn ~ morekids|samesex, data=df)
+famearn_cont_iv <- ivreg(famearn ~ morekids + educm + lowedm + educd + lowedd + agem + agem2 + agefstm + agefstm2 + aged + aged2 + agefstd + agefstd2 + blackm + hispm + othracem|samesex + educm + lowedm + educd + lowedd + agem + agem2 + agefstm + agefstm2 + aged + aged2 + agefstd + agefstd2 + blackm + hispm + othracem, data=df)
+
+
+
+```
+
+A table of the results is presented here:
+
+\newpage
+
+
+The IV estimate is less negative than the OLS estimate for mothers because of the "direction" of the omitted variables bias. (below is a basic explanation of how this manifests, which has been gone over in lecture; I'm not sure how thorough we need to be on the project, so skip ahead 1 paragraph or so if this is not necessary).
+
+Specifically, recall that IV estimates are used when there is correlation between the causal variable of interest and the error term, causing the OLS estimate to be biased. In math terms, for a regression $y_i = \beta_{0} + \beta_{1}x_{i} + \eta_{i}$, our estimate $\hat{\beta_{1}}$ will be as follows $$\hat{\beta_{1}} = \beta_{1} + \frac{\sum(x_{i} - \bar{x})\eta_{i}}{\sum(x_{i} - \bar{x})x_{i}} $$
+
+However, that last term might be nonzero if there is some omitted variable, leading to bias. Specifically, lets say the real model is $y_i = \beta_{0} + \beta_{1}x_{i} + \beta_{2}w_{i} + u_{i}$. This means $\eta_i = \beta_{2}w_{i} + u_{i}$, and when we plug back our value for $\eta_i$, we get
+
+$$\hat{\beta_{1}} = \beta_{1} + \frac{\sum(x_{i} - \bar{x})(\beta_{2}w_{i} + u_{i})}{\sum(x_{i} - \bar{x})x_{i}} $$
+$$ = \beta_{1} + \beta_{2}\frac{\sum(x_{i} - \bar{x})w_{i}}{\sum(x_{i} - \bar{x})x_{i}} + \frac{\sum(x_{i} - \bar{x})u_{i}}{\sum(x_{i} - \bar{x})x_{i}} $$
+In this "true" model, the last term is "truly" zero in expectation, but the second term is non-zero. The question is, **is the second term positive or negative?**
+
+The sign of the omitted variable bias in the formula above determines whether the IV estimate (which gets rid of that bias) is higher or lower than the biased OLS estimate. In our regression, there is some variable $w_{i}$ which correlates with $morekids$ DIFFERENTLY for men vs women, meaning $\sum x_{i}w_{i} > 0$ for one, and is $< 0$ for another. I hypothesize it could be something like, parent's earnings? Perhaps if you were a well-off male as a child, you may choose to have more kids just because you can, whereas if you were a better off female as a child, you would have fewer kids due to more opportunities for career pursuits/different values.
+
+\newpage
+### (b) - proof that adding together dependent variables can be estimated using the separate dependent variables
+
+Proof is below, on two pages.
+\newpage
+
+### (c) - verify that estimated OLS effect on mother/dad earnings add up to the OLS effect on family earnings.
+
+The result from (b) indicates that since $famearn = earningsm + earningsd$, then $\beta_{morekids,fam} = \beta_{morekids,m} + \beta_{morekids,d}$, and the fraction $\frac{\beta_{morekids,m}}{\beta_{morekids,fam}}$ defines the percentage of the family effect composed of the effect on mothers. We calculate this for both the OLS regressions, with and without controls, and show this to be true.
+
+```{r}
+beta_fam <- famearn_ols$coefficients["morekids"]
+beta_m <- earnm_ols$coefficients["morekids"]
+beta_d <- earnd_ols$coefficients["morekids"]
+
+beta_fam_cont <- famearn_cont_ols$coefficients["morekids"]
+beta_m_cont <- earnm_cont_ols$coefficients["morekids"]
+beta_d_cont <- earnd_cont_ols$coefficients["morekids"]
+
+c(beta_fam, beta_m, beta_d)
+c(beta_fam_cont, beta_m_cont, beta_d_cont)
+```
+
+By looking at the output above, we verify that $-5441.158 = -3662.022 + -1779.136$ and $-4956.65107 = -4882.45821 + -74.19286$. 
+
+We see that with and without controls, $\beta_{m}$ is way more influential. Without controls, the effect of having morekids on family earnings is $3662.022/5441.158 = 67\%$ driven by the kids' effect on the mother's earnings. With controls, the effect of morekids on family earnings is $4882.45821/4956.65107 = 98.5\%$ driven by the kids' effect on the mother.
+
+\newpage
+### (d) - repeating (c), but for the IV estimates this time
+
+The logic earlier still holds for the IV case. Proof below, on a new page:
+\newpage
+
+Now, verify that this is true with the coefficients we have.
+
+```{r}
+beta_fam <- famearn_iv$coefficients["morekids"]
+beta_m <- earnm_iv$coefficients["morekids"]
+beta_d <- earnd_iv$coefficients["morekids"]
+
+beta_fam_cont <- famearn_cont_iv$coefficients["morekids"]
+beta_m_cont <- earnm_cont_iv$coefficients["morekids"]
+beta_d_cont <- earnd_cont_iv$coefficients["morekids"]
+
+c(beta_fam, beta_m, beta_d)
+c(beta_fam_cont, beta_m_cont, beta_d_cont)
+```
+
+By looking at the output above, we verify that $-6810.088 = -3654.247 + -3155.842$ and $-6694.435 = -3097.655 +  -3596.780 $. 
+
+We see that with and without controls, $\beta_{m}$ is way more influential. Without controls, the effect of having morekids on family earnings is $3654.247/6810.088 = 53.66\%$ driven by the kids' effect on the mother's earnings. With controls, the effect of morekids on family earnings is $3097.655/6694.435 = 46.27\%$ driven by the kids' effect on the mother.
+
+\newpage
+
+### (e) Stuff about always-takers, compliers, never-takers, etc. 
+
+We need to look at the first-stage regression without controls (the regression of morekids on samesex, run in the earlier question 3(b)). This regression is $$MoreKids_{i} = \beta_{0} + \beta_{1}*SameSex_{i} + u_{i}$$.
+
+To get the AT/NT/C, we need to look at values of $P(AT) = E[MoreKids_{i} | SameSex_{i}=0]$, $P(C) = E[MoreKids_{i} | SameSex_{i}=1] - E[MoreKids_{i} | SameSex_{i}=0]$, and $P(NT) = 1 - (P(AT) + P(C))$. These values can be calculated by taking means on subsets of our population, or by using the basic first-stage regressions. I will show that these return the same value.
+
+\
+\
+\
+
+(i) fraction of AT (always-takers)
+
+In the first stage regression, we know that $E[MoreKids_{i} | SameSex_{i} = 0] = \pi_{0}$, since the regression intercept fits the mean of the datapoints for which $SameSex_{i} = 0$. So, we compare this regression coefficient (calculated earlier in fs_ssiv_lm, in part 3(b)) with the "manual method" of taking the mean $MoreKids_{i}$ value on the $SameSex=0$ subset of our data.
+
+```{r}
+manual_at <- mean(subset(df, samesex==0)$morekids)
+reg_at <- unname(fs_ssiv_lm$coefficients["(Intercept)"])
+manual_at
+reg_at
+```
+33.9% are always-takers. Both methods are equal!
+
+\
+\
+\
+
+(ii) fraction of NT (never-takers)
+Repeat the above. This time, the never-takers are all the people who are neither compliers or always-takers. Using the next part (where we calculate the compliers), $Pr(NT) = 1 - (Pr(AT) + Pr(C))$ = 0.59357864.
+
+\
+\
+\
+
+(iii) fraction of C (compliers)
+
+In the first stage regression, we know that $E[MoreKids_{i} | SameSex_{i} = 1] - E[MoreKids_{i} | SameSex_{i} = 0] = \pi_{1}$. The interpretation compliers are the people who we expect to have more kids iff they had 2 of the samesex. Like in part (i), compare the regression method with the manual subset method.
+
+```{r}
+manual_c <- mean(subset(df, samesex==1)$morekids) - mean(subset(df, samesex==0)$morekids)
+reg_c <- unname(fs_ssiv_lm$coefficients["samesex"])
+manual_c
+reg_c
+```
+
+\
+\
+\
+
+(iv) Compare AT/NT/C for four subgroups, based on mother's education level (<12, =12, b/w 13 and 15, and >16)
+I just use the manual subset methods for convenience's sake.
+
+
+```{r}
+at_le12 <- mean(subset(df, (educm < 12) & (samesex == 0))$morekids)
+c_le12 <- mean(subset(df, (educm < 12) & (samesex==1))$morekids) - at_le12
+nt_le12 <- 1 - (at_le12 + c_le12)
+le12 <- c(at_le12, c_le12, nt_le12)
+names(le12) <- c("AT <12", "C <12", "NT <12")
+
+at_e12 <- mean(subset(df, (educm == 12) & (samesex == 0))$morekids)
+c_e12 <- mean(subset(df, (educm == 12) & (samesex==1))$morekids) - at_e12
+nt_e12 <- 1 - (at_e12 + c_e12)
+e12 <- c(at_e12, c_e12, nt_e12)
+names(e12) <- c("AT =12", "C =12", "NT =12")
+
+at_1315 <- mean(subset(df, (educm > 13) & (educm < 15) & (samesex == 0))$morekids)
+c_1315 <- mean(subset(df, (educm > 13) & (educm < 15) & (samesex==1))$morekids) - at_1315
+nt_1315 <- 1 - (at_1315 + c_1315)
+e1315 <- c(at_1315, c_1315, nt_1315)
+names(e1315) <- c("AT >13<15", "C >13<15", "NT >13<15")
+
+at_g16 <- mean(subset(df, (educm >= 16) & (samesex == 0))$morekids)
+c_g16 <- mean(subset(df, (educm >= 16) & (samesex==1))$morekids) - at_g16
+nt_g16 <- 1 - (at_g16 + c_g16)
+g16 <- c(at_g16, c_g16, nt_g16)
+names(g16) <- c("AT >16", "C >16", "NT >16")
+
+le12
+e12
+e1315
+g16
+```
+
+From the results above, an interesting trend appears to be here - if the mother's education is low, they are more likely to always have more kids regardless of if their first children are the same sex (be an always-taker), and as they have more education they are less likely to be always-takers. They are also less likely to be compliers and more likely to be never-takers if they have higher education. What I take from this is that the more education the mother has, the less likely that having two kids of the samesex will cause them to have more. 
+
+HOWEVER, I doubt these results - deniers do exist within this dataset. It is incredibly plausible that if the first two kids are the same sex, the parents decide to not have more children - either because they wanted two children of the same sex, or they decided that having 2 boys was absolutely intolerable and they couldn't handle any more.
+
+\newpage
+### (f) - Calculate means for overall set of compliers using wonky ivreg method
+
+As seen in lecture, we want to do an instrumental variables regression in which we are interested in $x_{i}*morekids_{i}$ as an outcome variable, and $samesex_{i}$ as the instrumental variable. We calculate these means for compliers and compare them to the means for all families
+
+Fraction of complier mothers with < 12 years of schooling is 0.1598666, as calculated below. Compared to the average fraction of all mothers with < 12 years of schooling (0.1708711), compliant mothers are more likely to have less schooling.
+```{r}
+df$lowedmmorekidsint = df$lowedm*df$morekids
+modlowedm <- ivreg(lowedmmorekidsint ~ morekids | samesex, data=df)
+unname(modlowedm$coefficients[2])
+mean(df$lowedm)
+```
+
+Mean education of complier mothers is 12.2245 years, as seen below. This is slightly less than the overall mean education of mothers, which is 12.42263.
+```{r}
+df$educmmorekidsint = df$educm*df$morekids
+modeducm <- ivreg(educmmorekidsint ~ morekids | samesex, data=df)
+unname(modeducm$coefficients[2])
+mean(df$educm)
+```
+
+
+Mean age of first childbirth of complier mothers is 20.64157. This is less than the mean first childbirth age for all mothers, which is 20.84279.
+```{r}
+df$agefstmmorekidsint = df$agefstm*df$morekids
+modagefstm <- ivreg(agefstmmorekidsint ~ morekids | samesex, data=df)
+unname(modagefstm$coefficients[2])
+mean(df$agefstm)
+```
+
+
+Fraction of complier mothers who had their first child before 21 is 0.5269768. This is greater than the fraction of all mothers with a first child before 21, which is 0.4971686. This backs up the previous calculation - compliers tend to have given birth earlier.
+```{r}
+df$bef21 <- ifelse(df$agefstm < 21, 1, 0)
+df$bef21morekidsint = df$bef21*df$morekids
+modbef21 <- ivreg(bef21morekidsint ~ morekids | samesex, data=df)
+unname(modbef21$coefficients[2])
+mean(df$bef21)
+```
+
+
+Fraction of complier mothers who are hispanic is 0.01996363. Compared to the fraction of all mothers who are hispanic, 0.02509526, it seems that the complier population is less likely to be hispanic.
+```{r}
+df$hispmorekidsint = df$hispm*df$morekids
+modhisp <- ivreg(hispmorekidsint ~ morekids | samesex, data=df)
+unname(modhisp$coefficients[2])
+mean(df$hispm)
+```
+
+
+Fraction of complier mothers who are black is 0.0275295. Compared to the fraction of all mothers who are black, 0.04971264, it seems that the complier population is less likely to be black
+```{r}
+df$blackmmorekidsint = df$blackm*df$morekids
+modblack <- ivreg(blackmmorekidsint ~ morekids | samesex, data=df)
+unname(modblack$coefficients[2])
+mean(df$blackm)
+```
+
+
+Fraction of complier mothers who are white non-hispanic is 0.9269914. Compared to the fraction of all mothers who are white non-hispanic, 0.8967263, it seems that the complier population is more likely to be white than the regular population.
+```{r}
+df$wnhmorekidsint = df$wnhm*df$morekids
+modwnh <- ivreg(wnhmorekidsint ~ morekids | samesex, data=df)
+unname(modwnh$coefficients[2])
+mean(df$wnhm)
+```
+
+Fraction of complier mothers from Utah is 0.007350648, compared to fraction of all mothers from utah, 0.007350648.
+```{r}
+df$utah <- ifelse(df$st == 87, 1, 0)
+df$utahmorekidsint = df$utah*df$morekids
+modutah <- ivreg(utahmorekidsint ~ morekids | samesex, data=df)
+unname(modutah$coefficients[2])
+mean(df$utah)
+```
+
+
+\newpage
+# Part 2
+
+Train vs Holdout sampling, construct logwage variable
+```{r}
+df$logwaged <- log(df$waged)
+train_df <- subset(df, (rv < 0.75) & (educd==16))
+holdout_df <- subset(df, (rv >= 0.75) & (educd==16))
+```
+
+## 1 - OLS model
+
+I predict the wages for 26 and 35 year olds across states. The predicted logwaged for the 26 year olds and the 35 year olds are presented below in alphabetical order, on separate pages.
+```{r}
+big_ols <- lm(logwaged ~ aged + factor(st) + factor(st)*aged, train_df)
+
+wage_preds_26 <- c()
+wage_preds_35 <- c()
+dummystuff_states <- c(rep(0, 50))
+
+
+# for all 51 states except for maine (which was dropped due to colinearity)
+for (stval in c(1:50)) {
+  dummystuff_states[stval] <- 1
+  p_26 <- sum(big_ols$coefficients*c(1, 26, dummystuff_states, dummystuff_states*26))
+  p_35 <- sum(big_ols$coefficients*c(1, 35, dummystuff_states, dummystuff_states*35))
+  dummystuff_states[stval] <- 0
+  
+  wage_preds_26 <- c(wage_preds_26, p_26)
+  wage_preds_35 <- c(wage_preds_35, p_35)
+}
+
+# now, compute the estimate for maine
+p_maine_26 <- sum(big_ols$coefficients*c(1, 26, dummystuff_states, dummystuff_states*26))
+p_maine_35 <- sum(big_ols$coefficients*c(1, 35, dummystuff_states, dummystuff_states*35))
+
+wage_preds_26 <- c(p_maine_26, wage_preds_26)
+wage_preds_35 <- c(p_maine_35, wage_preds_35)
+statenames_ordered <- c("Maine", "New Hampshire", "Vermont", "Massachusetts", "Rhode Island", "Connecticut", "New York", "New Jersey", "Pennsylvania", "Ohio", "Indiana", "Illinois", "Michigan", "Wisconsin", "Minnesota", "Iowa", "Missouri", "North Dakota", "South Dakota", "Nebraska", "Kansas", "Delaware", "Maryland", "District of Columbia", "Virginia", "West Virginia", "North Carolina", "South Carolina", "Georgia", "Florida", "Kentucky", "Tennessee", "Alabama", "Mississippi", "Arkansas", "Louisiana", "Oklahoma", "Texas", "Montana", "Idaho", "Wyoming", "Colorado", "New Mexico", "Arizona", "Utah", "Nevada", "Washington", "Oregon", "California", "Alaska", "Hawaii") 
+
+names(wage_preds_26) <- statenames_ordered
+names(wage_preds_35) <- statenames_ordered
+
+```
+
+\newpage
+For 26 year olds:
+```{r}
+print(wage_preds_26[order(names(wage_preds_26))])
+```
+
+\newpage
+For 35 year olds:
+```{r}
+print(wage_preds_35[order(names(wage_preds_35))])
+```
+
+
+
+\newpage
+## 2 - k-fold CV LASSO model
+
+Some CV setup:
+```{r}
+#LASSO, CV
+#specify search space for lambdas (for LASSO)
+lambdas <- 10^seq(4, -4, by = -.1)
+
+#10-fold cross validation to find optimal lambda (alpha=1 means lasso only)
+lasso_cv_fit <- cv.glmnet(formula = logwaged ~ aged + factor(st) + aged:factor(st), alpha = 1, lambda = lambdas, data = train_df)
+
+#obtain lasso coefficients for the model with optimal lambda (in terms of CV error)
+coefs <- coef(lasso_cv_fit$glmnet.fit, s=lasso_cv_fit$lambda.min)
+```
+
+We use the obtained coefficients similarly to how we did in (1). First, we calculate the predicted values, and then present the predicted logwaged for 26 and 35 year olds below on separate pages.
+
+```{r}
+wage_preds_26_lasso <- c()
+wage_preds_35_lasso <- c()
+dummystuff_states <- c(rep(0, 51))
+
+
+# for all 51 states
+for (stval in c(1:51)) {
+  dummystuff_states[stval] <- 1
+  p_26 <- sum(coefs*c(1, 26, dummystuff_states, dummystuff_states*26))
+  p_35 <- sum(coefs*c(1, 35, dummystuff_states, dummystuff_states*35))
+  dummystuff_states[stval] <- 0
+  
+  wage_preds_26_lasso <- c(wage_preds_26_lasso, p_26)
+  wage_preds_35_lasso <- c(wage_preds_35_lasso, p_35)
+}
+
+statenames_ordered <- c("Maine", "New Hampshire", "Vermont", "Massachusetts", "Rhode Island", "Connecticut", "New York", "New Jersey", "Pennsylvania", "Ohio", "Indiana", "Illinois", "Michigan", "Wisconsin", "Minnesota", "Iowa", "Missouri", "North Dakota", "South Dakota", "Nebraska", "Kansas", "Delaware", "Maryland", "District of Columbia", "Virginia", "West Virginia", "North Carolina", "South Carolina", "Georgia", "Florida", "Kentucky", "Tennessee", "Alabama", "Mississippi", "Arkansas", "Louisiana", "Oklahoma", "Texas", "Montana", "Idaho", "Wyoming", "Colorado", "New Mexico", "Arizona", "Utah", "Nevada", "Washington", "Oregon", "California", "Alaska", "Hawaii") 
+
+names(wage_preds_26_lasso) <- statenames_ordered
+names(wage_preds_35_lasso) <- statenames_ordered
+
+```
+
+\newpage
+LASSO preds for 26 year olds:
+```{r}
+print(wage_preds_26_lasso[order(names(wage_preds_26_lasso))])
+```
+
+\newpage
+LASSO preds 35 year olds:
+```{r}
+print(wage_preds_26_lasso[order(names(wage_preds_26_lasso))])
+```
+
+\newpage
+## 3 - Best state for 26/35 year old men?
+
+For men who are 26, the evidence is split between OLS/LASSO on whether Alaska or Wyoming is better (with LASSO predicting Alaska, and OLS showing Wyoming). For 35 year olds, both models agree that Alaska is the best state.
+
+\newpage
+## 4 - Model evaluation on the holdout sample
+
+First, I just calculate OLS RMSES:
+```{r}
+ols_rmses <- c()
+lasso_rmses <- c()
+lmin <- lasso_cv_fit$lambda.min
+for (a in c(21:45)) {
+  data_for_age <- subset(holdout_df, aged == a)
+  y_actual <- data_for_age$logwaged
+  
+  y_pred_ols <- predict(big_ols, newdata=data_for_age)
+  ols_rmses <- c(ols_rmses, mean((y_pred_ols - y_actual)^2))
+
+}
+
+```
+
+\
+\
+\
+
+LASSO's predict function is being rude to me so I'm going to do the prediction manually. We have the coefs from previous portions.
+```{r}
+lasso_rmses <- c()
+dummystuff_states <- c(rep(0, 51))
+ordered_stcodes_util <- sort(unique(df$st))
+for (a in c(21:45)) {
+  data_for_age <- subset(holdout_df, aged == a)
+  y_actual <- data_for_age$logwaged
+  y_preds_lasso <- c()
+  
+  for (row in 1:nrow(data_for_age)) {
+    state_of_interest <- data_for_age[row, "st"]
+    corresponding_coeff_index <- match(state_of_interest, ordered_stcodes_util)
+    
+    dummystuff_states[corresponding_coeff_index] <- 1
+    individual_pred <- sum(coefs*c(1, a, dummystuff_states, dummystuff_states*a))
+    dummystuff_states[corresponding_coeff_index] <- 0
+    
+    y_preds_lasso <- c(y_preds_lasso, individual_pred)
+  }
+  
+  lasso_rmses <- c(lasso_rmses, mean((y_preds_lasso - y_actual)^2))
+}
+```
+
+We now graph the OLS and LASSO RMSEs.
+
+```{r}
+x_axis = c(21:45)
+plot(x_axis, ols_rmses, type="l", col="red", main="LASSO and OLS RMSEs for pred. men's logwage", xlab="Age of man", ylab="RMSE")
+lines(x_axis, lasso_rmses, col="blue")
+
+legend("topright", legend=c("OLS", "LASSO"),
+       col=c("red", "blue"), lty=1:2, cex=0.8)
+```
+
+We notice that OLS and LASSO are both relatively... the same on the holdout sample, with OLS performing marginally worse at some points and LASSO performing better at others. Here's an explanation of why that might be. Check out the following - a frequency count of how often each age appears in the training dataset:
+
+```{r}
+table(train_df$aged)
+```
+
+Recall that a big use of LASSO is generalizability; LASSO helps to select for only the important variables and 'zero-out' small idiosyncracies in the original dataset. So, it follows that when there are fewer data points available, OLS may overfit to the idiosyncracies in the data, whereas LASSO would not overfit as much. This is why we would expect LASSO to generalize better to the holdout data when there are fewer data points to go off of (at ages 21, 22, 23, etc) and same or worse when there is more data available (e.g. the age range in the 30s, where there is lots of training data).
